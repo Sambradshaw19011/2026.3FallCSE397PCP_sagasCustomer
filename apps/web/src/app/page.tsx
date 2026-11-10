@@ -30,14 +30,11 @@
  */
 
 import Link from 'next/link';
-import { DEFAULT_SITE, getSiteState, listSites } from '@sagas/read-model';
+import { listSites } from '@sagas/read-model';
 import { MapView } from '@/features/map/MapView';
-import { IntegrityBadge } from '@/features/site/IntegrityBadge';
-import { ConfidenceIndicator } from '@/features/article/ConfidenceIndicator';
 
 export default function Page() {
   const sites = listSites();
-  const state = getSiteState(DEFAULT_SITE, 't3');
 
   return (
     <div className="mx-auto max-w-3xl space-y-10 px-6 py-10 font-sans text-neutral-900">
@@ -59,39 +56,6 @@ export default function Page() {
           Places
         </h2>
         <MapView sites={sites} />
-      </section>
-
-      <section className="space-y-4">
-        <div className="space-y-2">
-          <h2 className="text-lg font-medium">{state.site.name}</h2>
-          <p className="text-sm text-neutral-600">
-            {state.site.address}, {state.site.city}
-          </p>
-          <IntegrityBadge integrity={state.integrity} />
-        </div>
-
-        {/*
-          Claims arrive ordered by weight, strongest first. Keep that order.
-          It is how the best-supported reading leads without anything being
-          marked "accepted" and without the others being hidden.
-        */}
-        <ol className="space-y-6 border-t border-neutral-200 pt-5">
-          {/* Dispute claims show under the claim they dispute, not as entries of their own. */}
-          {state.claims.filter((c) => !c.claim.disputedClaimId).map((claim) => (
-            <li key={claim.claim.id} className="space-y-1.5">
-              <p className="text-sm leading-relaxed">
-                {claim.claim.awaitingTranslation
-                  ? claim.claim.sourceLanguageText
-                  : claim.claim.text}
-              </p>
-              <p className="text-xs text-neutral-500">
-                {claim.contributor.displayName}
-                {claim.contributor.fictional && ' · invented'}
-              </p>
-              <ConfidenceIndicator claim={claim} />
-            </li>
-          ))}
-        </ol>
       </section>
 
       <footer className="border-t border-neutral-200 pt-5 text-xs text-neutral-600">
