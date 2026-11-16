@@ -99,11 +99,24 @@ pnpm db:psql      # open a psql shell inside the container
 to paste into `.env`. If something is wrong it tells you what to do rather than
 printing a stack trace.
 
-**The database is empty on purpose.** There are no application tables. Designing
-the schema, the relations, the spatial indexes and the migrations is a
-deliverable, and a scaffold that handed it over would be doing your work. What
-you get is Postgres with PostGIS and `pg_trgm` already enabled, so you can start
-designing instead of fighting extension installs.
+For the Experience layer, seed the local read model after starting Postgres:
+
+```bash
+cd apps/ui-api
+pnpm db:up
+pnpm db:verify
+pnpm db:seed
+```
+
+The web app reads this database during startup, so run these commands before
+`pnpm dev:web`.
+
+The content and intelligence databases are empty on purpose. There are no
+application tables in those layers. Designing their schema, relations, spatial
+indexes and migrations is a deliverable, and a scaffold that handed them over
+would be doing the work for you. What you get is Postgres with PostGIS and
+`pg_trgm` already enabled, so you can start designing instead of fighting
+extension installs.
 
 The ports start at 5433 rather than 5432 so they do not collide with a Postgres
 you may already be running.
@@ -199,7 +212,7 @@ Once you set `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`, it uses the same ports
 **Second, tell us.** If neither route works, say so at the check-in rather than
 losing a week to it. We can arrange access to a real bucket through Civum. That
 is a slower path because it involves a person, so try the two above first, but it
-exists and it is not a favour.
+exists and it is not a favor.
 
 **What not to do:** do not write files to a local folder behind your own
 interface and plan to swap it later. This project expects presigned uploads from the start, because a browser uploading straight to storage and a browser sending the file through your API are built differently, and switching later means a rewrite.
@@ -261,7 +274,7 @@ Check these first:
   instead of generating one when it was asked for. See `apps/capture-api/README.md`.
 - **`ffprobe: command not found`.** ffmpeg isn't installed. See the object
   storage section above.
-- **The map renders grey.** Your Mapbox token is missing or malformed. Check
+- **The map renders gray.** Your Mapbox token is missing or malformed. Check
   `.env` has it, then restart the dev server. Next.js only reads `.env` at startup.
 - **A tool says everything passed and you don't believe it.** It may be
   replaying a cached result. [`docs/DEBUGGING.md`](./docs/DEBUGGING.md) covers

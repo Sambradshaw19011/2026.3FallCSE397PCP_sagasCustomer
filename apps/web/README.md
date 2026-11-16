@@ -22,8 +22,13 @@ interface has to survive.
 ```bash
 pnpm install
 cp .env.example .env      # add your own Mapbox token, or don't. See below.
-pnpm dev:web
+pnpm --filter @sagas/ui-api db:up      # needs Docker Desktop running
+pnpm --filter @sagas/ui-api db:seed    # again after every upstream sync
+pnpm dev:web                           # restart it after every seed
 ```
+
+The web app reads from the Experience Postgres database during startup, so the
+database must be running and seeded before `pnpm dev:web`.
 
 Two routes exist:
 
@@ -51,16 +56,16 @@ const sites = listSites();                        // every place, for the map
 const state = getSiteState(sites[0].slug, 't3');  // 't0' | 't1' | 't2' | 't3'
 ```
 
-Today those functions read fixture JSON off disk.
+Those functions read the experience read model from Postgres, so the database
+has to be up and seeded before `pnpm dev:web` shows anything (see "Run it"
+above). Restart `pnpm dev:web` after every seed. How the data is loaded is in
+`packages/read-model/README.md`.
 
-**Your first infrastructure job is to put a database behind them.** Run Postgres
-locally, design a schema for reading, seed the fixture states into it, and make
-`packages/read-model` query it instead. That is real work and it belongs to whoever holds
-the back end and database roles: schema design, spatial indexing so "everything
+The database work that remains belongs to whoever holds the back end and
+database roles: a schema shaped for reading, spatial indexing so "everything
 within 2km of here" is fast enough to drive a map, and working out what is held
-in memory versus fetched per request.
-
-Do it early. `packages/read-model/README.md` says why.
+in memory versus fetched per request. `packages/read-model/README.md` has the
+details.
 
 It stays local. Nothing here talks to a server anyone else runs, and nothing
 deploys until you decide to.
@@ -75,7 +80,7 @@ find yourself wanting to fetch narrative state from a service that does not
 exist, stop and bring it to a check-in. It means the contract is missing
 something, which is worth knowing early.
 
-## How the files are organised
+## How the files are organized
 
 ```
 src/app/          routes. Pages read data and hand it down.
@@ -123,7 +128,7 @@ is worth keeping.
 **Copy the data flow.** The page reads, components take props. That is what lets
 the same components render against four fixture states on `/dev`.
 
-**Do not copy the styling.** Grey text and system fonts are a placeholder. The
+**Do not copy the styling.** Gray text and system fonts are a placeholder. The
 design system is your deliverable, and nothing in there is a suggestion.
 
 The idea this project cares most about is in `ConfidenceIndicator`: agreement
@@ -173,7 +178,7 @@ version is below.
   for it.
 
 Keep the app portable. Nothing load-bearing should depend on one host's
-special behaviour, which is why putting the web app and the API in containers is
+special behavior, which is why putting the web app and the API in containers is
 on the backlog.
 
 Spatial queries are the expensive part of this layer, which is one of

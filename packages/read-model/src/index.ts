@@ -1,10 +1,9 @@
 /**
  * Every read the experience layer does goes through here.
  *
- * Today these functions read fixture JSON off disk. That is a starting point,
- * not the design. Putting a real database behind them is the first
- * infrastructure job on this layer, and nothing that calls them changes when
- * you do, which is why they sit in one package.
+ * These functions read the experience read model from Postgres. The database
+ * is loaded during module initialisation so the public, synchronous API stays
+ * compatible with the existing server components and API callers.
  *
  * Two things import this and only two: `apps/web`, which calls it directly from
  * server components, and `apps/ui-api`, which exposes it over HTTP for the
@@ -17,49 +16,86 @@
  * JSON inside a component, that is the mistake this package exists to prevent.
  */
 
-import { loadIndex, loadSiteState, loadWorld } from '@sagas/fixtures/acceptance';
+import { Pool } from 'pg';
 import type { GraphState, Site } from '@sagas/contracts';
 
-/** The fixture snapshots that exist. Real data will not be labelled like this. */
+/** The fixture snapshots that exist. Real data will not be labeled like this. */
 export type FixtureStateId = 't0' | 't1' | 't2' | 't3';
 
 export const FIXTURE_STATES: FixtureStateId[] = ['t0', 't1', 't2', 't3'];
+
+interface ReadModelRow {
+  slug: string;
+  state_id: FixtureStateId;
+  position: number;
+  site: Site;
+  graph_state: GraphState;
+}
+
+const pool = new Pool({
+  connectionString:
+    process.env.DATABASE_URL ??
+    'postgresql://sagas:sagas@127.0.0.1:5435/sagas_read',
+});
+
+let rows;
+try {
+  rows = await pool.query<ReadModelRow>(
+    `SELECT slug, state_id, position, site, graph_state
+   FROM experience_read_model
+   ORDER BY position, state_id`,
+  );
+} catch (error) {
+  await pool.end();
+  throw new Error(
+    'Experience database not reachable. Run pnpm --filter @sagas/ui-api db:up then pnpm --filter @sagas/ui-api db:seed',
+    { cause: error },
+  );
+}
+
+await pool.end();
+
+const statesBySlug = new Map<string, Map<FixtureStateId, ReadModelRow>>();
+for (const row of rows.rows) {
+  const states =
+    statesBySlug.get(row.slug) ?? new Map<FixtureStateId, ReadModelRow>();
+  states.set(row.state_id, row);
+  statesBySlug.set(row.slug, states);
+}
 
 /**
  * Every place, for the map and for search.
  *
  * With a database this becomes a query with a bounding-box filter, so the map
  * fetches what is on screen rather than the whole country to draw one
- * neighbourhood. The bounding box is the argument this still does not take.
+ * neighborhood. The bounding box is the argument this still does not take.
  *
  * Read `docs/GIS.md` before writing that query. "Everything within 2km" is not
  * a subtraction problem.
  */
 export function listSites(stateId: FixtureStateId = 't3'): Site[] {
-  return loadWorld(stateId).map((s) => s.site);
+  return [...statesBySlug.values()]
+    .map((states) => states.get(stateId)?.site)
+    .filter((site): site is Site => site !== undefined);
 }
 
 /** The flagship site's slug, which is what a page falls back to with no slug. */
 export const DEFAULT_SITE = 'corner-shop';
 
-/** Turn a slug into the fixture directory the states were written under. */
-function keyForSlug(slug: string): string {
-  const entry = loadIndex().sites.find((s) => s.slug === slug);
-  if (!entry) {
-    throw new Error(
-      `No site with slug '${slug}'. Known slugs: ${loadIndex().sites.map((s) => s.slug).join(', ')}`,
-    );
-  }
-  return entry.key;
-}
-
 /**
- * Everything known about one place, as of one moment.
+ * Everything known about one site, as of a time. The fixtures answer for their four test moments.
  *
  * With a database this becomes a join across places, records, claims and
  * contributions, then the scoring pass. Watch the query count. The obvious
  * version runs one query per claim and falls over at any real size.
  */
 export function getSiteState(slug: string, stateId: FixtureStateId): GraphState {
-  return loadSiteState(keyForSlug(slug), stateId);
+  const row = statesBySlug.get(slug)?.get(stateId);
+  if (!row) {
+    const knownSlugs = [...statesBySlug.keys()].join(', ');
+    throw new Error(
+      `No site state for slug '${slug}' at '${stateId}'. Known slugs: ${knownSlugs}`,
+    );
+  }
+  return row.graph_state;
 }

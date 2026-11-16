@@ -30,11 +30,13 @@
  */
 
 import Link from 'next/link';
-import { listSites } from '@sagas/read-model';
+import { DEFAULT_SITE, getSiteState, listSites } from '@sagas/read-model';
+import { ArticleView } from '@/features/article/ArticleView';
 import { MapView } from '@/features/map/MapView';
 
 export default function Page() {
   const sites = listSites();
+  const state = getSiteState(DEFAULT_SITE, 't3');
 
   return (
     <div className="mx-auto max-w-3xl space-y-10 px-6 py-10 font-sans text-neutral-900">
@@ -57,6 +59,8 @@ export default function Page() {
         </h2>
         <MapView sites={sites} />
       </section>
+
+      <ArticleView state={state} />
 
       <footer className="border-t border-neutral-200 pt-5 text-xs text-neutral-600">
         <Link href="/dev" className="underline">

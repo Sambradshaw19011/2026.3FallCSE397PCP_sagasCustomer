@@ -81,11 +81,12 @@ later pull.
 **Demos.** Anything in the changelog since the last specification meeting is
 what gets shown, running.
 
-**Updates.** The product owner sends the sponsor a short email every Thursday:
-what's done, what's next, and anything stuck. Informal is fine.
+**Updates.** New stories go into the backlog on Thursday evenings. The product
+owner sends the sponsor a short update every Friday: what's done, what's next,
+who took which new story, and anything stuck. Informal is fine.
 
 **When you finish or get blocked,** take the next item in your workstream from
-"The backlog behind sprint one" below. Write the issue yourself with the
+"Sprint two" in `BACKLOG.md`, or "The backlog behind sprint one" below. Write the issue yourself with the
 template under "Template for a new story" in `BACKLOG.md`, and mention the sponsor in
 the questions issue so he can check it. If your workstream is empty, take
 something from another one or from "Anyone", and say so in the issue. Waiting
@@ -113,7 +114,7 @@ something.
    database the sponsor sets up for the team. All data is invented or public
    record, and invented data is marked as invented. Real testimony and real
    personal data wait for the sponsor's own hosting.
-4. **No organisation is named** on anything public until it has agreed to be.
+4. **No organization is named** on anything public until it has agreed to be.
 5. **The shared contract changes by pull request.** The team's own schema, and
    any extra test data kept in its own apps, are free to extend. Changes to
    `packages/contracts` or `packages/fixtures` go upstream as a pull request
@@ -135,8 +136,8 @@ freedom is meant to be spent: sections as separate floating blocks, exploring
 regions of claims rather than one claim at a time, and clean transitions between
 the page and the claims behind it.
 
-A few things are fixed. The page works before it is polished. Colour contrast
-meets the level already set in story A1, colours and spacing are defined once as
+A few things are fixed. The page works before it is polished. Color contrast
+meets the level already set in story A1, colors and spacing are defined once as
 design tokens, and it works on a phone.
 
 ## What the sponsor provides
@@ -158,7 +159,7 @@ The product owner assigns these. Interface work is open to everyone.
 | Workstream | Owns |
 |---|---|
 | Platform | The pipeline, hosting, the domain and the landing page build |
-| Data | `packages/read-model`, `apps/ui-api`, the database, and what the page needs from the fixtures |
+| Data | `packages/read-model`, `apps/ui-api`, the database, what the page needs from the fixtures, and the state each screen keeps (see Da8) |
 | Map and discovery | The map, search, pins and the list view |
 | Narrative page | Turning claims into a readable page |
 | Design | Wireframes, style, the landing page copy, what is missing |
