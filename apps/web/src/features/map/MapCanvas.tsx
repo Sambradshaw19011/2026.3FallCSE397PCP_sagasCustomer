@@ -28,19 +28,26 @@ export function MapCanvas({ sites, token }: { sites: SiteListEntry[]; token: str
 
     mapboxgl.accessToken = token;
 
-    const center: [number, number] = [
-      sites.reduce((sum, { site }) => sum + site.coordinates[0], 0) / sites.length,
-      sites.reduce((sum, { site }) => sum + site.coordinates[1], 0) / sites.length,
-    ];
+    const validSites = sites.filter(({ site }) => {
+      const [longitude, latitude] = site.coordinates;
+      return (
+        Number.isFinite(longitude) && Number.isFinite(latitude)
+        && longitude >= -180 && longitude <= 180 && latitude >= -90 && latitude <= 90
+      );
+    });
+    if (validSites.length === 0) return;
+
+    const bounds = new mapboxgl.LngLatBounds();
+    validSites.forEach(({ site }) => bounds.extend(site.coordinates));
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: 'mapbox://styles/mapbox/light-v11',
-      center,
-      zoom: 5,
+      bounds,
+      fitBoundsOptions: { padding: 48, maxZoom: 16 },
     });
 
-    sites.forEach(({ site, integrityLabel }) => {
+    validSites.forEach(({ site, integrityLabel }) => {
       const markerEl = document.createElement('button');
       markerEl.type = 'button';
       markerEl.title = `${site.name}: ${integrityLabel}`;

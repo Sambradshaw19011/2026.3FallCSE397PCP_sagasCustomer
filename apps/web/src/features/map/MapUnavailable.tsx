@@ -1,3 +1,25 @@
+/**
+ * The places, as a list.
+ *
+ * ---
+ *
+ * WORKED EXAMPLE. It is finished rather than stubbed because it ships either way.
+ *
+ * Two reasons this ships whether or not there is a map:
+ *
+ * 1. A map alone is unusable with a screen reader. This list is how the same
+ *    information reaches somebody who cannot see it, so this project treats it
+ *    as part of meeting WCAG 2.1 AA rather than a fallback for a missing token.
+ * 2. Anybody can work on the whole application without registering for
+ *    anything. Nobody is blocked waiting on a Mapbox account.
+ *
+ * It renders when there is no token, and it should keep rendering when there is
+ * one, whether beside the map or behind a toggle.
+ *
+ * Docs:
+ *   Lists and semantics   https://www.w3.org/WAI/tutorials/page-structure/content/
+ *   Tailwind utilities    https://tailwindcss.com/docs/utility-first
+ */
 'use client';
 
 import Link from 'next/link';

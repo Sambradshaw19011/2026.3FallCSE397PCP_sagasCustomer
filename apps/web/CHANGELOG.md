@@ -16,6 +16,10 @@ conflict on a later pull.
 - What works now, in a sentence a visitor would understand. (#pull request number, who)
 ```
 
+## 2026-11-16
+
+- Places appear on a map fitted to their locations and in a searchable list that also works without a Mapbox token; the sandbox list follows the selected fixture state. (#56, Sam)
+
 ## 2026-11-03
 
 - The landing page’s “How it works” link is taller and easier to tap on a phone. (#47, Michael)
