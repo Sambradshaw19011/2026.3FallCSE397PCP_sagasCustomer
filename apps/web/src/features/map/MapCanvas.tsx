@@ -1,80 +1,155 @@
 'use client';
 
 import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
-import { useEffect, useRef } from 'react';
-import type { SiteListEntry } from './MapUnavailable';
 
-function toneForLabel(label: string): string {
-  switch (label) {
-    case 'Thin record':
-      return '#f59e0b';
-    case 'Growing record':
-      return '#fbbf24';
-    case 'Well documented':
-      return '#10b981';
-    case 'Richly documented':
-      return '#2563eb';
-    default:
-      return '#6b7280';
-  }
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+import { useEffect, useRef } from 'react';
+
+import type { MapSearchResult } from './MapSearch';
+import type { SiteListEntry, Viewport } from './siteDiscovery';
+import { MapSearch } from './MapSearch';
+import { siteHref, usableCoordinates } from './siteDiscovery';
+import { siteIconClass } from './SiteIcon';
+
+interface MapCanvasProps {
+  sites: SiteListEntry[];
+  visibleSites: SiteListEntry[];
+  token: string;
+  onViewportChange: (viewport: Viewport | undefined) => void;
+  onUnavailable: () => void;
+  onSearchSelected: () => void;
 }
 
-export function MapCanvas({ sites, token }: { sites: SiteListEntry[]; token: string }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+export function MapCanvas({
+  sites,
+  visibleSites,
+  token,
+  onViewportChange,
+  onUnavailable,
+  onSearchSelected,
+}: MapCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<mapboxgl.Map>(null);
+  const searchMarkerRef = useRef<mapboxgl.Marker>(null);
+  const markersRef = useRef(new Map<string, mapboxgl.Marker>());
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    mapboxgl.accessToken = token;
-
-    const validSites = sites.filter(({ site }) => {
-      const [longitude, latitude] = site.coordinates;
-      return (
-        Number.isFinite(longitude) && Number.isFinite(latitude)
-        && longitude >= -180 && longitude <= 180 && latitude >= -90 && latitude <= 90
-      );
-    });
-    if (validSites.length === 0) return;
+    const container = containerRef.current;
+    if (!container) return;
+    onViewportChange(undefined);
 
     const bounds = new mapboxgl.LngLatBounds();
-    validSites.forEach(({ site }) => bounds.extend(site.coordinates));
+    for (const { site } of sites) {
+      const coordinates = usableCoordinates(site);
+      if (coordinates) bounds.extend(coordinates);
+    }
+    if (bounds.isEmpty()) {
+      onUnavailable();
+      return;
+    }
 
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: 'mapbox://styles/mapbox/light-v11',
-      bounds,
-      fitBoundsOptions: { padding: 48, maxZoom: 16 },
-    });
-
-    validSites.forEach(({ site, integrityLabel }) => {
-      const markerEl = document.createElement('button');
-      markerEl.type = 'button';
-      markerEl.title = `${site.name}: ${integrityLabel}`;
-      markerEl.setAttribute('aria-label', `View ${site.name}`);
-      markerEl.style.width = '14px';
-      markerEl.style.height = '14px';
-      markerEl.style.border = '2px solid rgba(255,255,255,0.9)';
-      markerEl.style.borderRadius = '9999px';
-      markerEl.style.background = toneForLabel(integrityLabel);
-      markerEl.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.35)';
-      markerEl.style.cursor = 'pointer';
-      markerEl.style.display = 'block';
-      markerEl.addEventListener('click', () => {
-        window.location.assign(`/sites/${site.slug}`);
+    let map: mapboxgl.Map;
+    try {
+      map = new mapboxgl.Map({
+        accessToken: token,
+        container,
+        style: 'mapbox://styles/mapbox/light-v11',
+        bounds,
+        fitBoundsOptions: { padding: 48, maxZoom: 16 },
       });
+    } catch {
+      onUnavailable();
+      return;
+    }
+    mapRef.current = map;
 
-      new mapboxgl.Marker({ element: markerEl, anchor: 'bottom' })
-        .setLngLat(site.coordinates)
-        .addTo(map);
+    // The constructor fits all sites. Only subsequent moves should filter the list.
+    map.on('moveend', () => {
+      const visible = map.getBounds();
+      if (visible) {
+        onViewportChange({
+          west: visible.getWest(),
+          east: visible.getEast(),
+          south: visible.getSouth(),
+          north: visible.getNorth(),
+        });
+      }
     });
 
-    return () => map.remove();
-  }, [sites, token]);
+    let loaded = false;
+    map.once('load', () => {
+      loaded = true;
+    });
+    map.on('error', () => {
+      if (!loaded && !map.isStyleLoaded()) onUnavailable();
+    });
+
+    const markers = markersRef.current;
+    for (const { site, integrityLabel } of sites) {
+      const coordinates = usableCoordinates(site);
+      if (!coordinates) continue;
+
+      const element = document.createElement('a');
+      element.href = siteHref(site);
+      element.setAttribute('role', 'link');
+      element.title = `${site.name}: ${integrityLabel}`;
+      element.setAttribute(
+        'aria-label',
+        `View ${site.name}, ${integrityLabel}`,
+      );
+      element.className = siteIconClass(integrityLabel);
+
+      const marker = new mapboxgl.Marker({ element, anchor: 'bottom' })
+        .setLngLat(coordinates)
+        .addTo(map);
+      markers.set(site.id, marker);
+    }
+
+    return () => {
+      searchMarkerRef.current?.remove();
+      searchMarkerRef.current = null;
+      mapRef.current = null;
+      for (const marker of markers.values()) marker.remove();
+      markers.clear();
+      map.remove();
+    };
+  }, [sites, token, onViewportChange, onUnavailable]);
+
+  useEffect(() => {
+    const visibleIds = new Set(visibleSites.map(({ site }) => site.id));
+    for (const [id, marker] of markersRef.current) {
+      marker.getElement().hidden = !visibleIds.has(id);
+    }
+  }, [sites, token, visibleSites]);
+
+  function showSearchResult({ label, coordinates }: MapSearchResult) {
+    const map = mapRef.current;
+    if (!map) return;
+
+    searchMarkerRef.current?.remove();
+    const marker = new mapboxgl.Marker({ color: '#1d4ed8' })
+      .setLngLat(coordinates)
+      .addTo(map);
+    const element = marker.getElement();
+    element.setAttribute('role', 'img');
+    element.setAttribute('aria-label', `Map search result: ${label}`);
+    element.style.pointerEvents = 'none';
+    searchMarkerRef.current = marker;
+    onSearchSelected();
+    map.jumpTo({ center: coordinates, zoom: 15 });
+  }
 
   return (
-    <div className="overflow-hidden rounded border border-neutral-300 bg-neutral-50">
-      <div ref={containerRef} aria-label="Map showing places" className="h-[320px] w-full" />
+    <div className="space-y-2">
+      <MapSearch token={token} onSelect={showSearchResult} />
+      <div className="overflow-hidden rounded border border-neutral-300 bg-neutral-50">
+        <div
+          ref={containerRef}
+          aria-label="Map showing places"
+          className="h-[320px] w-full"
+        />
+      </div>
     </div>
   );
 }

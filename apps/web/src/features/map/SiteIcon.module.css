@@ -1,0 +1,33 @@
+/* Provisional flat illustration. Sponsor options are in public/map/style-samples.svg. */
+.icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid #404040;
+  border-radius: 50%;
+  background: white url('/map/place.svg') center / 1.5rem no-repeat;
+}
+
+.dotted {
+  border-style: dotted;
+}
+.dashed {
+  border-style: dashed;
+}
+.solid {
+  border-style: solid;
+}
+.double {
+  border-style: double;
+}
+
+.icon:focus-visible {
+  outline: 2px solid #171717;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px white;
+}
+.icon[hidden] {
+  display: none;
+}
