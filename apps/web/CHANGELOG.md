@@ -19,6 +19,9 @@ conflict on a later pull.
 ## 2026-11-16
 
 - Places appear on a map fitted to their locations and in a searchable list that also works without a Mapbox token; the sandbox list follows the selected fixture state. (#56, Sam)
+## 2026-11-14
+
+- Visitors to the web app can open the shared contributor terms from its footer. ([#64](https://github.com/byui-cse397/2026.3FallCSE397PCP_sagasCustomer/pull/64), Michael)
 
 ## 2026-11-03
 
