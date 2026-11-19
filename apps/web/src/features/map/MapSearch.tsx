@@ -14,7 +14,7 @@ export interface MapSearchResult {
   coordinates: [number, number];
 }
 
-const SESSION_INACTIVITY_MS = 180_000;
+const SESSION_INACTIVITY_MS = 120_000;
 const MAX_SUGGEST_REQUESTS_PER_SESSION = 50;
 
 interface SessionState {

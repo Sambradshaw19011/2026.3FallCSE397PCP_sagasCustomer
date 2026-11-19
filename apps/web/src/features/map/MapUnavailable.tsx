@@ -68,7 +68,8 @@ interface MapUnavailableProps {
   areaActive: boolean;
   mapAvailable: boolean;
   onShowAllPlaces: () => void;
-  onFilterToMapArea: () => void;
+  /** Present only when the area filter is off and the map has an area to apply. */
+  onFilterToMapArea?: () => void;
 }
 
 /** The accessible site list, shown alongside the map and on its own. */
@@ -129,29 +130,23 @@ export function MapUnavailable({
         )}
       </div>
 
-      {mapAvailable && areaActive && (
+      {/* One button that changes its label, so keyboard focus stays on it. */}
+      {mapAvailable && (areaActive || onFilterToMapArea) && (
         <div className="flex flex-wrap items-center gap-2 rounded border border-neutral-300 bg-neutral-50 px-3 py-2">
           <p className="flex-1 text-sm text-neutral-700">
-            Showing places in the visible map area.
+            {areaActive
+              ? 'Showing places in the visible map area.'
+              : 'Showing places anywhere on the map.'}
             {query.trim() && ' The name filter still applies.'}
           </p>
           <button
             type="button"
-            onClick={onShowAllPlaces}
+            onClick={areaActive ? onShowAllPlaces : onFilterToMapArea}
             className="rounded border border-neutral-500 px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-neutral-700"
           >
-            Show all places
+            {areaActive ? 'Show all places' : 'Filter to map area'}
           </button>
         </div>
-      )}
-      {mapAvailable && !areaActive && (
-        <button
-          type="button"
-          onClick={onFilterToMapArea}
-          className="rounded border border-neutral-500 px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-neutral-700"
-        >
-          Filter to map area
-        </button>
       )}
 
       {mainSites.length === 0 && (

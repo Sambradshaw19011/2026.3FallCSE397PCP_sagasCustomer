@@ -52,11 +52,12 @@ export function MapDiscovery({
         onQueryChange={setQuery}
         areaActive={Boolean(activeViewport)}
         mapAvailable={showMap}
-        onShowAllPlaces={() => {
-          setAreaFilterEnabled(false);
-          setViewport(undefined);
-        }}
-        onFilterToMapArea={() => setAreaFilterEnabled(true)}
+        onShowAllPlaces={() => setAreaFilterEnabled(false)}
+        onFilterToMapArea={
+          !areaFilterEnabled && viewport
+            ? () => setAreaFilterEnabled(true)
+            : undefined
+        }
       />
     </div>
   );

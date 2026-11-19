@@ -26,11 +26,16 @@ Official Mapbox sources, reviewed 19 November 2026:
 
 ## Costs and session rules
 
-Mapbox documents `/suggest` plus `/retrieve` as one billable search session.
-A session ends after `/suggest` followed by `/retrieve`, after 180 seconds
-without a `/retrieve`-following `/suggest`/retrieve sequence, or after 50
-successive `/suggest` calls. Each ended session is one billable session.
-Concurrent sessions must use distinct tokens.
+The [Search Box API reference](https://docs.mapbox.com/api/search/search-box/#session-billing)
+lists 180 seconds for a `/suggest` without a following `/retrieve`. The
+[Mapbox pricing page](https://www.mapbox.com/pricing#search) lists 2 minutes
+of inactivity and includes up to 50 `/suggest` calls and one `/retrieve`
+in a billable session.
+
+The app uses the shorter inactivity limit of 120 seconds, measured from
+the latest `/suggest`. A selection after the 50th `/suggest` still uses the
+same token for `/retrieve`. A 51st `/suggest` starts a new session.
+Concurrent sessions use distinct tokens.
 
 The current pricing page lists introductory preview pricing of 500 free
 sessions per month, then $3.00 per 1,000 sessions through 100,000 sessions,

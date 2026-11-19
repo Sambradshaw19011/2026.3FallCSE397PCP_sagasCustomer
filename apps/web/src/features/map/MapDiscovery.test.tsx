@@ -268,7 +268,7 @@ describe('map discovery', () => {
     expect(secondToken).not.toBe(firstToken);
   });
 
-  it('renews Mapbox sessions after 50 suggestions and 180 seconds', async () => {
+  it('renews the Mapbox session for the 51st suggest call', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ suggestions: [] })),
@@ -289,15 +289,36 @@ describe('map discovery', () => {
     }
     expect(new Set(tokens.slice(0, 50)).size).toBe(1);
     expect(tokens[50]).not.toBe(tokens[49]);
+  });
+
+  it('expires Mapbox suggestions and renews the token after 120 seconds of inactivity', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn<(url: string) => Promise<Response>>();
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            suggestions: [{ mapbox_id: 'address-id', name: 'Main Street' }],
+          }),
+        ),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    show('test-token');
 
     search('time one', 'map');
     await act(async () => {
       await vi.advanceTimersByTimeAsync(300);
     });
     const beforeExpiry = String(fetchMock.mock.calls.at(-1)?.[0]);
+    const option = () =>
+      page.querySelector('ul[aria-label="Map search suggestions"] button');
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(180_000);
+      await vi.advanceTimersByTimeAsync(119_999);
     });
+    expect(option()?.textContent).toBe('Main Street');
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(option()).toBeNull();
     search('after inactivity', 'map');
     await act(async () => {
       await vi.advanceTimersByTimeAsync(300);
@@ -306,6 +327,50 @@ describe('map discovery', () => {
     expect(
       new URL(afterExpiry).searchParams.get('session_token'),
     ).not.toBe(new URL(beforeExpiry).searchParams.get('session_token'));
+  });
+
+  it('retrieves a selection from the 50th suggest call with the same token', async () => {
+    const coordinates = first.site.coordinates;
+    if (!coordinates) throw new Error('Missing Corner Shop coordinates');
+    vi.useFakeTimers();
+    const fetchMock = vi.fn((url: string) => {
+      const path = new URL(url).pathname;
+      const data = path.endsWith('/suggest')
+        ? { suggestions: [{ mapbox_id: 'address-id', name: 'Main Street' }] }
+        : { features: [{ geometry: { coordinates } }] };
+      return Promise.resolve(new Response(JSON.stringify(data)));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    show('test-token');
+
+    for (let index = 0; index < 50; index += 1) {
+      search(`place ${index}`, 'map');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(50);
+    const option = page.querySelector<HTMLButtonElement>(
+      'ul[aria-label="Map search suggestions"] button',
+    );
+    if (!option) throw new Error('Missing address suggestion');
+    await act(() => {
+      option.click();
+      return Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(51);
+    const lastSuggest = new URL(String(fetchMock.mock.calls[49]?.[0]));
+    const retrieve = new URL(String(fetchMock.mock.calls[50]?.[0]));
+    const sessionToken = lastSuggest.searchParams.get('session_token');
+    expect(lastSuggest.pathname).toBe('/search/searchbox/v1/suggest');
+    expect(sessionToken).toBeTruthy();
+    expect(retrieve.pathname).toBe('/search/searchbox/v1/retrieve/address-id');
+    expect(retrieve.searchParams.get('session_token')).toBe(sessionToken);
+    expect(mapbox.jumpTo).toHaveBeenCalledWith({
+      center: coordinates,
+      zoom: 15,
+    });
   });
 
   it.each(['t0', 't1', 't2', 't3'] as const)(
@@ -378,6 +443,38 @@ describe('map discovery', () => {
     expect(page.textContent).toContain(
       'Showing places in the visible map area.',
     );
+  });
+
+  it('offers the area filter only when there is an area, applies it at once, and keeps keyboard focus', () => {
+    show('test-token');
+    const button = (name: string) =>
+      [...page.querySelectorAll('button')].find(
+        (candidate) => candidate.textContent === name,
+      );
+    expect(button('Filter to map area')).toBeUndefined();
+    expect(button('Show all places')).toBeUndefined();
+
+    const coordinates = first.site.coordinates;
+    if (!coordinates) throw new Error('Missing Corner Shop coordinates');
+    const [longitude, latitude] = coordinates;
+    move({
+      west: longitude - 0.001,
+      east: longitude + 0.001,
+      south: latitude - 0.001,
+      north: latitude + 0.001,
+    });
+    const inArea = listed();
+    expect(inArea.length).toBeLessThan(sites.length);
+
+    const toggle = button('Show all places');
+    toggle?.focus();
+    act(() => toggle?.click());
+    expect(listed()).toHaveLength(sites.length);
+    expect(document.activeElement?.textContent).toBe('Filter to map area');
+
+    act(() => (document.activeElement as HTMLButtonElement | null)?.click());
+    expect(listed()).toEqual(inArea);
+    expect(document.activeElement?.textContent).toBe('Show all places');
   });
 
   it('uses the same fallback illustration and accessible integrity text on markers and list links', () => {
