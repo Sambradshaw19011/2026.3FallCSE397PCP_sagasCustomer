@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 import type { SiteListEntry } from './siteDiscovery';
 import { siteHref, usableCoordinates } from './siteDiscovery';
-import { siteIconClass } from './SiteIcon';
+import { integrityTreatments, siteIconClass } from './SiteIcon';
 
 function PlacesList({ sites }: { sites: SiteListEntry[] }) {
   return (
@@ -23,6 +23,9 @@ function PlacesList({ sites }: { sites: SiteListEntry[] }) {
               <span
                 aria-hidden="true"
                 className={siteIconClass(integrityLabel)}
+                data-integrity-symbol={
+                  integrityTreatments[integrityLabel]?.symbol ?? 'W'
+                }
               />
               <span>
                 <span className="text-sm font-medium text-neutral-900 group-hover:underline">
@@ -63,6 +66,9 @@ interface MapUnavailableProps {
   query: string;
   onQueryChange: (query: string) => void;
   areaActive: boolean;
+  mapAvailable: boolean;
+  onShowAllPlaces: () => void;
+  onFilterToMapArea: () => void;
 }
 
 /** The accessible site list, shown alongside the map and on its own. */
@@ -71,6 +77,9 @@ export function MapUnavailable({
   query,
   onQueryChange,
   areaActive,
+  mapAvailable,
+  onShowAllPlaces,
+  onFilterToMapArea,
 }: MapUnavailableProps) {
   const searchId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -119,6 +128,31 @@ export function MapUnavailable({
           </button>
         )}
       </div>
+
+      {mapAvailable && areaActive && (
+        <div className="flex flex-wrap items-center gap-2 rounded border border-neutral-300 bg-neutral-50 px-3 py-2">
+          <p className="flex-1 text-sm text-neutral-700">
+            Showing places in the visible map area.
+            {query.trim() && ' The name filter still applies.'}
+          </p>
+          <button
+            type="button"
+            onClick={onShowAllPlaces}
+            className="rounded border border-neutral-500 px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-neutral-700"
+          >
+            Show all places
+          </button>
+        </div>
+      )}
+      {mapAvailable && !areaActive && (
+        <button
+          type="button"
+          onClick={onFilterToMapArea}
+          className="rounded border border-neutral-500 px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-neutral-700"
+        >
+          Filter to map area
+        </button>
+      )}
 
       {mainSites.length === 0 && (
         <p role="status" className="text-sm text-neutral-600">

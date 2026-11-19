@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { SiteListEntry } from './siteDiscovery';
 import { filterSites } from './siteDiscovery';
+import { integrityTreatments, siteIconClass } from './SiteIcon';
 
 const sites: SiteListEntry[] = [
   {
@@ -32,6 +33,36 @@ const sites: SiteListEntry[] = [
     integrityInvitation: 'Corroborated across contributors and source types.',
   },
 ];
+
+describe('integrity icon treatments', () => {
+  it('maps every band to a distinct border treatment and symbol', () => {
+    expect(siteIconClass('Thin record')).toContain('dotted');
+    expect(siteIconClass('Growing record')).toContain('dashed');
+    expect(siteIconClass('Well documented')).toContain('solid');
+    expect(siteIconClass('Richly documented')).toContain('double');
+    expect(Object.values(integrityTreatments).map(({ symbol }) => symbol)).toEqual([
+      'T',
+      'G',
+      'W',
+      'R',
+    ]);
+  });
+
+  it('provides an accessible description for each mapping', () => {
+    expect(integrityTreatments['Thin record']?.description).toContain(
+      'Thin record',
+    );
+    expect(integrityTreatments['Growing record']?.description).toContain(
+      'Growing record',
+    );
+    expect(integrityTreatments['Well documented']?.description).toContain(
+      'Well documented',
+    );
+    expect(integrityTreatments['Richly documented']?.description).toContain(
+      'Richly documented',
+    );
+  });
+});
 
 describe('filterSites', () => {
   it('does not match documentation labels', () => {

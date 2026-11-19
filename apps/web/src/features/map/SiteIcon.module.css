@@ -21,6 +21,23 @@
 }
 .double {
   border-style: double;
+  border-width: 5px;
+}
+
+.icon[data-integrity-symbol]::after {
+  content: attr(data-integrity-symbol);
+  display: grid;
+  width: 1.05rem;
+  height: 1.05rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #404040;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+  transform: translate(0.85rem, 0.85rem);
+  box-shadow: 0 0 0 1px white;
 }
 
 .icon:focus-visible {

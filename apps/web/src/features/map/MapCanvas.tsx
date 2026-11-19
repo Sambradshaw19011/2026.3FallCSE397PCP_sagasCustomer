@@ -10,7 +10,7 @@ import type { MapSearchResult } from './MapSearch';
 import type { SiteListEntry, Viewport } from './siteDiscovery';
 import { MapSearch } from './MapSearch';
 import { siteHref, usableCoordinates } from './siteDiscovery';
-import { siteIconClass } from './SiteIcon';
+import { integrityTreatments, siteIconClass } from './SiteIcon';
 
 interface MapCanvasProps {
   sites: SiteListEntry[];
@@ -92,13 +92,14 @@ export function MapCanvas({
 
       const element = document.createElement('a');
       element.href = siteHref(site);
-      element.setAttribute('role', 'link');
       element.title = `${site.name}: ${integrityLabel}`;
       element.setAttribute(
         'aria-label',
         `View ${site.name}, ${integrityLabel}`,
       );
       element.className = siteIconClass(integrityLabel);
+      element.dataset.integritySymbol =
+        integrityTreatments[integrityLabel]?.symbol ?? 'W';
 
       const marker = new mapboxgl.Marker({ element, anchor: 'bottom' })
         .setLngLat(coordinates)

@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 interface Suggestion {
   mapbox_id: string;
@@ -14,6 +14,17 @@ export interface MapSearchResult {
   coordinates: [number, number];
 }
 
+const SESSION_INACTIVITY_MS = 180_000;
+const MAX_SUGGEST_REQUESTS_PER_SESSION = 50;
+
+interface SessionState {
+  token: string;
+  accessToken: string;
+  suggestCount: number;
+  ended: boolean;
+  lastActivityAt: number;
+}
+
 export function MapSearch({
   token,
   onSelect,
@@ -23,13 +34,65 @@ export function MapSearch({
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
-  const session = useRef<string>(undefined);
+  const session = useRef<SessionState>(undefined);
+  const sessionGeneration = useRef(0);
+  const expiryTimer = useRef<number>(undefined);
+  const suggestController = useRef<AbortController>(undefined);
   const retrieval = useRef<AbortController>(undefined);
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [status, setStatus] = useState('');
 
-  useEffect(() => () => retrieval.current?.abort(), []);
+  useEffect(
+    () => () => {
+      suggestController.current?.abort();
+      retrieval.current?.abort();
+      if (expiryTimer.current !== undefined)
+        window.clearTimeout(expiryTimer.current);
+    },
+    [],
+  );
+
+  const renewSession = useCallback(
+    (now = Date.now(), accessToken = token) => {
+      sessionGeneration.current += 1;
+      if (expiryTimer.current !== undefined)
+        window.clearTimeout(expiryTimer.current);
+      expiryTimer.current = undefined;
+      session.current = {
+        token: crypto.randomUUID(),
+        accessToken,
+        suggestCount: 0,
+        ended: false,
+        lastActivityAt: now,
+      };
+    },
+    [token],
+  );
+
+  const ensureSession = useCallback(
+    (now = Date.now(), accessToken = token) => {
+      const current = session.current;
+      const expired = current
+        ? current.accessToken !== accessToken ||
+          current.ended ||
+          now - current.lastActivityAt >= SESSION_INACTIVITY_MS
+        : true;
+      if (expired)
+        renewSession(now, accessToken);
+      return session.current;
+    },
+    [renewSession, token],
+  );
+
+  const expireSession = useCallback(() => {
+    sessionGeneration.current += 1;
+    session.current = undefined;
+    expiryTimer.current = undefined;
+    suggestController.current?.abort();
+    suggestController.current = undefined;
+    setSuggestions([]);
+  }, []);
 
   useEffect(() => {
     const text = query.trim();
@@ -37,12 +100,29 @@ export function MapSearch({
 
     const controller = new AbortController();
     async function suggest() {
+      let activeGeneration = sessionGeneration.current;
       try {
-        session.current ??= crypto.randomUUID();
+        suggestController.current = controller;
+        const activeSession = ensureSession();
+        if (!activeSession) return;
+        activeGeneration = sessionGeneration.current;
+        activeSession.suggestCount += 1;
+        activeSession.lastActivityAt = Date.now();
+        const sessionToken = activeSession.token;
+        if (
+          activeSession.suggestCount >= MAX_SUGGEST_REQUESTS_PER_SESSION
+        )
+          activeSession.ended = true;
+        if (expiryTimer.current !== undefined)
+          window.clearTimeout(expiryTimer.current);
+        expiryTimer.current = window.setTimeout(
+          expireSession,
+          SESSION_INACTIVITY_MS,
+        );
         const params = new URLSearchParams({
           q: text,
           access_token: token,
-          session_token: session.current,
+          session_token: sessionToken,
           limit: '5',
         });
         const response = await fetch(
@@ -53,7 +133,11 @@ export function MapSearch({
         );
         if (!response.ok) throw new Error('Search failed');
         const data = (await response.json()) as { suggestions: Suggestion[] };
-        if (controller.signal.aborted) return;
+        if (
+          controller.signal.aborted ||
+          sessionGeneration.current !== activeGeneration
+        )
+          return;
         setSuggestions(data.suggestions);
         setStatus(
           data.suggestions.length
@@ -61,7 +145,10 @@ export function MapSearch({
             : 'No addresses or places found.',
         );
       } catch {
-        if (!controller.signal.aborted)
+        if (
+          !controller.signal.aborted &&
+          sessionGeneration.current === activeGeneration
+        )
           setStatus('Map search is unavailable. Try again.');
       }
     }
@@ -70,13 +157,14 @@ export function MapSearch({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, token]);
+  }, [ensureSession, expireSession, query, token]);
 
   async function select(suggestion: Suggestion) {
-    const sessionToken = session.current;
-    if (!sessionToken) return;
+    const sessionState = session.current;
+    if (!sessionState) return;
+    const sessionToken = sessionState.token;
 
-    session.current = undefined;
+    expireSession();
     const controller = new AbortController();
     retrieval.current = controller;
     setQuery('');
@@ -119,7 +207,7 @@ export function MapSearch({
 
   function updateQuery(value: string) {
     retrieval.current?.abort();
-    if (!value.trim()) session.current = undefined;
+    if (!value.trim()) expireSession();
     setSuggestions([]);
     setStatus('');
     setQuery(value);

@@ -180,6 +180,9 @@ describe('map discovery', () => {
             features: [{ geometry: { coordinates } }],
           }),
         ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ suggestions: [] })),
       );
     vi.stubGlobal('fetch', fetchMock);
     show('test-token');
@@ -226,6 +229,83 @@ describe('map discovery', () => {
       'Pin dropped at Main Street',
     );
     expect(document.activeElement).toBe(input);
+
+    const retrieveToken = requestUrls[1]?.searchParams.get('session_token');
+    search('next place', 'map');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    const nextToken = new URL(
+      String(fetchMock.mock.calls.at(-1)?.[0]),
+    ).searchParams.get('session_token');
+    expect(nextToken).not.toBe(retrieveToken);
+  });
+
+  it('renews Mapbox sessions after explicit clearing', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ suggestions: [] })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    show('test-token');
+
+    search('first place', 'map');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    const firstToken = new URL(
+      String(fetchMock.mock.calls.at(-1)?.[0]),
+    ).searchParams.get('session_token');
+
+    search('', 'map');
+    search('second place', 'map');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    const secondToken = new URL(
+      String(fetchMock.mock.calls.at(-1)?.[0]),
+    ).searchParams.get('session_token');
+    expect(secondToken).not.toBe(firstToken);
+  });
+
+  it('renews Mapbox sessions after 50 suggestions and 180 seconds', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ suggestions: [] })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    show('test-token');
+
+    const tokens: string[] = [];
+    for (let index = 0; index < 51; index += 1) {
+      search(`place ${index}`, 'map');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      const call: unknown = fetchMock.mock.calls[index]?.[0];
+      if (typeof call === 'string') {
+        tokens.push(new URL(call).searchParams.get('session_token') ?? '');
+      }
+    }
+    expect(new Set(tokens.slice(0, 50)).size).toBe(1);
+    expect(tokens[50]).not.toBe(tokens[49]);
+
+    search('time one', 'map');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    const beforeExpiry = String(fetchMock.mock.calls.at(-1)?.[0]);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(180_000);
+    });
+    search('after inactivity', 'map');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    const afterExpiry = String(fetchMock.mock.calls.at(-1)?.[0]);
+    expect(
+      new URL(afterExpiry).searchParams.get('session_token'),
+    ).not.toBe(new URL(beforeExpiry).searchParams.get('session_token'));
   });
 
   it.each(['t0', 't1', 't2', 't3'] as const)(
@@ -254,6 +334,13 @@ describe('map discovery', () => {
       south: latitude - 0.001,
       north: latitude + 0.001,
     });
+    expect(page.textContent).toContain(
+      'Showing places in the visible map area.',
+    );
+    const showAll = [...page.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Show all places',
+    );
+    expect(showAll).not.toBeUndefined();
     expect(listed()).toContain('/sites/corner-shop');
     expect(listed().length).toBeLessThan(sites.length);
 
@@ -268,6 +355,29 @@ describe('map discovery', () => {
     expect(listed()).toEqual(['/sites/corner-shop']);
     expect(pinned()[0]?.getAttribute('href')).toBe('/sites/corner-shop');
     expect(mapbox.construct).toHaveBeenCalledTimes(1);
+
+    showAll?.focus();
+    act(() => showAll?.click());
+    expect(search('corner shop').value).toBe('corner shop');
+    expect(listed()).toEqual(['/sites/corner-shop']);
+    expect(page.textContent).not.toContain(
+      'Showing places in the visible map area.',
+    );
+    move({
+      west: 0,
+      east: 1,
+      south: 0,
+      north: 1,
+    });
+    expect(listed()).toEqual(['/sites/corner-shop']);
+
+    const filterArea = [...page.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Filter to map area',
+    );
+    act(() => filterArea?.click());
+    expect(page.textContent).toContain(
+      'Showing places in the visible map area.',
+    );
   });
 
   it('uses the same fallback illustration and accessible integrity text on markers and list links', () => {

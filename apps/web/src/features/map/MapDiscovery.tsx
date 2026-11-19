@@ -16,6 +16,7 @@ export function MapDiscovery({
 }) {
   const [query, setQuery] = useState('');
   const [viewport, setViewport] = useState<Viewport>();
+  const [areaFilterEnabled, setAreaFilterEnabled] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
   const markUnavailable = useCallback(() => {
     setUnavailable(true);
@@ -23,7 +24,8 @@ export function MapDiscovery({
   }, []);
 
   const showMap = Boolean(token && !unavailable);
-  const activeViewport = showMap ? viewport : undefined;
+  const activeViewport =
+    showMap && areaFilterEnabled ? viewport : undefined;
   const visibleSites = filterSites(query, sites, activeViewport);
 
   if (sites.length === 0) {
@@ -49,6 +51,12 @@ export function MapDiscovery({
         query={query}
         onQueryChange={setQuery}
         areaActive={Boolean(activeViewport)}
+        mapAvailable={showMap}
+        onShowAllPlaces={() => {
+          setAreaFilterEnabled(false);
+          setViewport(undefined);
+        }}
+        onFilterToMapArea={() => setAreaFilterEnabled(true)}
       />
     </div>
   );
